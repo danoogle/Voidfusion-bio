@@ -27,6 +27,7 @@
     "classnames": "^2.3.1",
     "gray-matter": "^4.0.3",
     "next": "^16.0.8",
+    "next-auth": "^4.24.13",
     "next-mdx-remote": "^5.0.0",
     "next-remote-watch": "2.0.0",
     "prismjs": "^1.29.0",
