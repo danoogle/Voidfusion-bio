@@ -1,3 +1,11 @@
 [build]
   command = "npm run build"
   publish = ".next"
+
+[functions]
+  directory = "netlify/functions"
+
+# Enable Netlify Identity for the site
+# Note: After deployment, you must enable Netlify Identity in the Netlify dashboard:
+# Site settings > Identity > Enable Identity
+# Then configure external providers (Google) to allow login with dssilmmain@gmail.com
