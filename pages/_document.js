@@ -7,7 +7,7 @@ class MyDocument extends Document {
     const cssVars = generateCssVariables();
 
     return (
-      <Html lang="en" className="theme-compiled">
+      <Html lang="en" className="theme-compiled dark">
         <Head>
           <style>{`:root{${cssVars}}`}</style>
         </Head>
