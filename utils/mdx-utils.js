@@ -27,7 +27,9 @@ export const sortPostsByDate = (posts) => {
   });
 };
 
-export const getPosts = () => {
+export const getPosts = (options = {}) => {
+  const { includePrivate = false } = options;
+
   let posts = getPostFilePaths().map((filePath) => {
     const source = fs.readFileSync(path.join(POSTS_PATH, filePath));
     const { content, data } = matter(source);
@@ -39,9 +41,19 @@ export const getPosts = () => {
     };
   });
 
+  // Filter out private posts unless includePrivate is true
+  if (!includePrivate) {
+    posts = posts.filter((post) => post.data.isPublic !== false);
+  }
+
   posts = sortPostsByDate(posts);
 
   return posts;
+};
+
+// Get all posts including private ones (for admin/static generation)
+export const getAllPosts = () => {
+  return getPosts({ includePrivate: true });
 };
 
 export const getPostBySlug = async (slug) => {
