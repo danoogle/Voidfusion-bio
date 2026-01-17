@@ -1,10 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
+import { getStore } from '@netlify/blobs';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 
-const POSTS_PATH = path.join(process.cwd(), 'posts');
+// Helper to get posts store with strong consistency for admin operations
+function getPostsStore() {
+  return getStore({ name: 'posts', consistency: 'strong' });
+}
 
 export default async function handler(req, res) {
   // Check authentication
@@ -14,29 +15,28 @@ export default async function handler(req, res) {
   }
 
   const { slug } = req.query;
-  const filePath = path.join(POSTS_PATH, `${slug}.mdx`);
+  const store = getPostsStore();
 
   // Check if post exists
-  if (!fs.existsSync(filePath)) {
+  const existingPost = await store.get(slug, { type: 'json' });
+  if (!existingPost) {
     return res.status(404).json({ error: 'Post not found' });
   }
 
   if (req.method === 'GET') {
     // Get single post
     try {
-      const source = fs.readFileSync(filePath, 'utf8');
-      const { content, data } = matter(source);
-
       return res.status(200).json({
         slug,
         filename: `${slug}.mdx`,
-        title: data.title || 'Untitled',
-        description: data.description || '',
-        date: data.date || '',
-        isPublic: data.isPublic !== false,
-        content,
+        title: existingPost.title || 'Untitled',
+        description: existingPost.description || '',
+        date: existingPost.date || '',
+        isPublic: existingPost.isPublic !== false,
+        content: existingPost.content || '',
       });
     } catch (error) {
+      console.error('Failed to fetch post:', error);
       return res.status(500).json({ error: 'Failed to fetch post' });
     }
   }
@@ -50,28 +50,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Title is required' });
       }
 
-      // Read existing post to preserve any additional frontmatter
-      const source = fs.readFileSync(filePath, 'utf8');
-      const { data: existingData } = matter(source);
-
-      const frontmatter = {
-        ...existingData,
+      const postData = {
+        ...existingPost,
         title,
         description: description || '',
-        date: date || existingData.date,
+        date: date || existingPost.date,
         isPublic: isPublic !== false,
+        content: content || '',
       };
 
-      const fileContent = matter.stringify(content || '', frontmatter);
-      fs.writeFileSync(filePath, fileContent);
+      await store.setJSON(slug, postData);
 
       return res.status(200).json({
         slug,
         filename: `${slug}.mdx`,
-        ...frontmatter,
-        content: content || '',
+        ...postData,
       });
     } catch (error) {
+      console.error('Failed to update post:', error);
       return res.status(500).json({ error: 'Failed to update post' });
     }
   }
@@ -79,9 +75,10 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     // Delete post
     try {
-      fs.unlinkSync(filePath);
+      await store.delete(slug);
       return res.status(200).json({ message: 'Post deleted successfully' });
     } catch (error) {
+      console.error('Failed to delete post:', error);
       return res.status(500).json({ error: 'Failed to delete post' });
     }
   }
