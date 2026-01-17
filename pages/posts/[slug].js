@@ -1,10 +1,9 @@
 import { getGlobalData } from '../../utils/global-data';
-import {
-  getNextPostBySlug,
-  getPostBySlug,
-  getPreviousPostBySlug,
-  getPostFilePaths,
-} from '../../utils/mdx-utils';
+import { getPostsFromStore, getPostFromStore } from '../../utils/posts-store';
+import { serialize } from 'next-mdx-remote/serialize';
+import rehypePrism from '@mapbox/rehype-prism';
+import remarkGfm from 'remark-gfm';
+import rehypeUnwrapImages from 'rehype-unwrap-images';
 
 import { MDXRemote } from 'next-mdx-remote';
 import Head from 'next/head';
@@ -104,32 +103,51 @@ export default function PostPage({
   );
 }
 
-export const getStaticProps = async ({ params }) => {
+export const getServerSideProps = async ({ params }) => {
   const globalData = getGlobalData();
-  const { mdxSource, data } = await getPostBySlug(params.slug);
-  const prevPost = getPreviousPostBySlug(params.slug);
-  const nextPost = getNextPostBySlug(params.slug);
+
+  // Get the current post
+  const post = await getPostFromStore(params.slug);
+
+  if (!post) {
+    return { notFound: true };
+  }
+
+  // Check if post is private - don't show on public site
+  if (post.data.isPublic === false) {
+    return { notFound: true };
+  }
+
+  // Serialize MDX content
+  const mdxSource = await serialize(post.content, {
+    mdxOptions: {
+      remarkPlugins: [remarkGfm],
+      rehypePlugins: [rehypePrism, rehypeUnwrapImages],
+    },
+    scope: post.data,
+  });
+
+  // Get all posts for prev/next navigation
+  const allPosts = await getPostsFromStore();
+  const currentIndex = allPosts.findIndex((p) => p.slug === params.slug);
+
+  const prevPost = currentIndex > 0 ? {
+    title: allPosts[currentIndex - 1].data.title,
+    slug: allPosts[currentIndex - 1].slug,
+  } : null;
+
+  const nextPost = currentIndex < allPosts.length - 1 ? {
+    title: allPosts[currentIndex + 1].data.title,
+    slug: allPosts[currentIndex + 1].slug,
+  } : null;
 
   return {
     props: {
       globalData,
       source: mdxSource,
-      frontMatter: data,
+      frontMatter: post.data,
       prevPost,
       nextPost,
     },
-  };
-};
-
-export const getStaticPaths = async () => {
-  const paths = getPostFilePaths()
-    // Remove file extensions for page paths
-    .map((path) => path.replace(/\.mdx?$/, ''))
-    // Map the path into the static paths object required by Next.js
-    .map((slug) => ({ params: { slug } }));
-
-  return {
-    paths,
-    fallback: false,
   };
 };

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getPosts } from '../utils/mdx-utils';
+import { getPostsFromStore } from '../utils/posts-store';
 
 import Footer from '../components/Footer';
 import Header from '../components/Header';
@@ -60,8 +60,8 @@ export default function Index({ posts, globalData }) {
   );
 }
 
-export function getStaticProps() {
-  const posts = getPosts();
+export async function getServerSideProps() {
+  const posts = await getPostsFromStore();
   const globalData = getGlobalData();
 
   return { props: { posts, globalData } };
